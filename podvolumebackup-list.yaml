@@ -3,7 +3,7 @@ kind: Plugin
 metadata:
   name: podvolumebackup-list
 spec:
-  version: "v0.0.1"
+  version: "v0.0.2"
   homepage: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list
   shortDescription: List Velero podvolumebackups with size, pod and date
   description: |
@@ -14,11 +14,11 @@ spec:
       matchLabels:
         os: darwin
         arch: arm64
-    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.0.1/kubectl-podvolumebackup-list
-    sha256: 626e449316cf59dfbafbf612d3894ed5564d17ebbc5ceb6dce47ab41bdc0507b
-    bin: kubectl-podvolumebackup-list
+    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.0.1/kubectl-podvolumebackup_list
+    sha256: eab8d9ff1564fd778a3847ac0b8c57f3f37991169aae37efebfe93ab738a9afe
+    bin: kubectl-podvolumebackup_list
     files:
-      - from: kubectl-podvolumebackup-list
+      - from: kubectl-podvolumebackup_list
         to: .
   caveats: |
     This plugin requires 'jq' and 'numfmt' installed and available in your PATH.
