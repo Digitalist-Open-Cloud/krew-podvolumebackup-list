@@ -1,19 +1,16 @@
 #!/bin/bash
 
-# Kontrollera att ett argument skickats in
 if [ $# -ne 1 ]; then
-  echo "Usage: $0 <backup-name-prefix>"
+  echo "Usage: $0 <backup-name>"
   exit 1
 fi
 
 PREFIX="$1"
 NAMESPACE="${2:-velero}"
 
-# Skriv rubrik
 echo "Backup name: $PREFIX"
 echo
 
-# Hämta och bearbeta data
 kubectl get podvolumebackups.velero.io \
   -n "$NAMESPACE" \
   -o json | \
