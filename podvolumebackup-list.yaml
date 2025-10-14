@@ -1,0 +1,26 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: podvolumebackup-list
+spec:
+  version: "v0.0.1"
+  homepage: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list
+  shortDescription: List Velero podvolumebackups with size, pod and date
+  description: |
+    A simple plugin to list Velero podvolumebackups for a given backup prefix, showing pod name, volume, size and creation date.
+    Requires jq and numfmt installed locally.
+  platforms:
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: arm64
+    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.0.1/kubectl-podvolumebackup-list
+    sha256: 336fc8baee309c13d8e10ca6945b89e68567ff8bca346187d63b431097208efa
+    bin: kubectl-podvolumebackup-list
+    files:
+      - from: kubectl-podvolumebackup-list
+        to: .
+  caveats: |
+    This plugin requires 'jq' and 'numfmt' installed and available in your PATH.
+    Usage:
+      kubectl podvolumebackup-list <backup name prefix> [namespace]

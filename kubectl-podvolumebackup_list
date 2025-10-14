@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Kontrollera att ett argument skickats in
+if [ $# -ne 1 ]; then
+  echo "Usage: $0 <backup-name-prefix>"
+  exit 1
+fi
+
+PREFIX="$1"
+NAMESPACE="${2:-velero}"
+
+# Skriv rubrik
+echo "Backup name: $PREFIX"
+echo
+
+# Hämta och bearbeta data
+kubectl get podvolumebackups.velero.io \
+  -n "$NAMESPACE" \
+  -o json | \
+jq -r --arg PREFIX "${PREFIX}" '
+  .items[] | select(.metadata.name | startswith($PREFIX)) |
+  [
+    (.spec.pod.name // "-"),
+    (.spec.volume // "-"),
+    (.status.progress.totalBytes // 0),
+    (.metadata.creationTimestamp // "-")
+  ] | @tsv' | \
+sort -k1,1 | \
+while IFS=$'\t' read -r podname volume size_bytes created
+do
+  size_hr=$(numfmt --to=iec-i --suffix=B --padding=7 "$size_bytes" 2>/dev/null)
+  printf "%-60s %-25s %-10s %s\n" "$podname" "$volume" "$size_hr" "$created"
+done | \
+awk 'BEGIN {
+         printf "%-60s %-25s %-10s %s\n", "Pod name", "Volume", "Size", "Created";
+         print "------------------------------------------------------------------------------------------------------------";
+     } 1'
