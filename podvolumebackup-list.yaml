@@ -14,7 +14,7 @@ spec:
       matchLabels:
         os: darwin
         arch: arm64
-    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.0.1/kubectl-podvolumebackup_list
+    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.0.2/kubectl-podvolumebackup_list
     sha256: eab8d9ff1564fd778a3847ac0b8c57f3f37991169aae37efebfe93ab738a9afe
     bin: kubectl-podvolumebackup_list
     files:
