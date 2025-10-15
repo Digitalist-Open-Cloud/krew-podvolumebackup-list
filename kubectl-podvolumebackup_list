@@ -67,6 +67,7 @@ jq -r \
     )
   | [
       (.spec.pod.name // "-"),
+      (.spec.pod.namespace // "-"),
       (.spec.volume // "-"),
       (.status.progress.totalBytes // 0),
       (.metadata.creationTimestamp // "-")
@@ -74,13 +75,13 @@ jq -r \
   | @tsv' | \
 sort -k1,1 | \
 awk 'BEGIN {
-         printf "%-60s %-25s %-10s %s\n", "Pod name", "Volume", "Size", "Created";
-         print "------------------------------------------------------------------------------------------------------------";
+         printf "%-40s %-20s %-15s %-10s %s\n", "Pod name", "Namespace", "Volume", "Size", "Created";
+         print "-------------------------------------------------------------------------------------------------------------";
      }
      {
-         size_hr = $3;
-         cmd = "numfmt --to=iec-i --suffix=B --padding=7 " $3 " 2>/dev/null";
+         size_hr = $4;
+         cmd = "numfmt --to=iec-i --suffix=B --padding=5 " $4 " 2>/dev/null";
          cmd | getline size_hr;
          close(cmd);
-         printf "%-60s %-25s %-10s %s\n", $1, $2, size_hr, $4;
+         printf "%-40s %-20s %-15s %-10s %s\n", $1, $2, $3, size_hr, $5;
      }'
