@@ -6,6 +6,22 @@ Takes one required argument, name of Velero backup, and a second optional argume
 
 Pod volume backups are listed in alphabetic order.
 
+## Usage
+
+Check in Velero which backups you have:
+
+```shell
+velero get backups
+```
+
+Choose the backup you want to list pod volume backups from, like `velero-nightly-20251014050055`, and use that as an argument for the plugin:
+
+```shell
+kubectl podvolumebackup-list velero-nightly-20251015050033
+```
+
+And now you should get a list of your pod volume backups.
+
 ## Requirements
 
 `jq` and `numfmt`
