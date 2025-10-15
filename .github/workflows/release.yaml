@@ -25,10 +25,13 @@ jobs:
       - name: Make sure plugin is executable
         run: chmod +x kubectl-podvolumebackup_list
 
+      - name: Create plugin archive
+        run: tar -czf podvolumebackup-list.tar.gz kubectl-podvolumebackup_list
+
       - name: Generate SHA256 checksum
         id: checksum
         run: |
-          sha256sum kubectl-podvolumebackup_list | awk '{print $1}' > plugin.sha256
+          sha256sum podvolumebackup-list.tar.gz | awk '{print $1}' > plugin.sha256
           echo "sha256=$(cat plugin.sha256)" >> $GITHUB_OUTPUT
 
       - name: Generate Krew manifest (linux + mac)
@@ -50,7 +53,7 @@ jobs:
                 matchLabels:
                   os: linux
                   arch: amd64
-              uri: ${{ steps.vars.outputs.uri }}
+              uri: https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.tar.gz
               sha256: ${{ steps.checksum.outputs.sha256 }}
               bin: kubectl-podvolumebackup_list
               files:
@@ -60,7 +63,7 @@ jobs:
                 matchLabels:
                   os: darwin
                   arch: arm64
-              uri: ${{ steps.vars.outputs.uri }}
+              uri: https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.tar.gz
               sha256: ${{ steps.checksum.outputs.sha256 }}
               bin: kubectl-podvolumebackup_list
               files:
