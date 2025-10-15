@@ -17,14 +17,14 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
-          echo "uri=https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/kubectl-podvolumebackup-list" >> $GITHUB_OUTPUT
+          echo "uri=https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/kubectl-podvolumebackup_list" >> $GITHUB_OUTPUT
 
       - name: Make sure plugin is executable
-        run: chmod +x kubectl-podvolumebackup-list
+        run: chmod +x kubectl-podvolumebackup_list
 
       - name: Generate SHA256 checksum
         run: |
-          sha256sum kubectl-podvolumebackup-list | awk '{print $1}' > plugin.sha256
+          sha256sum kubectl-podvolumebackup_list | awk '{print $1}' > plugin.sha256
           echo "sha256=$(cat plugin.sha256)" >> $GITHUB_OUTPUT
         id: checksum
 
@@ -49,9 +49,9 @@ jobs:
                   arch: amd64
               uri: ${{ steps.vars.outputs.uri }}
               sha256: ${{ steps.checksum.outputs.sha256 }}
-              bin: kubectl-podvolumebackup-list
+              bin: kubectl-podvolumebackup_list
               files:
-                - from: kubectl-podvolumebackup-list
+                - from: kubectl-podvolumebackup_list
                   to: .
             - selector:
                 matchLabels:
@@ -59,9 +59,9 @@ jobs:
                   arch: arm64
               uri: ${{ steps.vars.outputs.uri }}
               sha256: ${{ steps.checksum.outputs.sha256 }}
-              bin: kubectl-podvolumebackup-list
+              bin: kubectl-podvolumebackup_list
               files:
-                - from: kubectl-podvolumebackup-list
+                - from: kubectl-podvolumebackup_list
                   to: .
             caveats: |
               This plugin requires 'jq' and 'numfmt' installed and available in your PATH.
@@ -73,7 +73,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            kubectl-podvolumebackup-list
+            kubectl-podvolumebackup_list
             plugin.sha256
             podvolumebackup-list.yaml
         env:
