@@ -9,3 +9,7 @@ Pod volume backups are listed in alphabetic order.
 ## Requirements
 
 `jq` and `numfmt`
+
+## Installation
+
+See release notes.
