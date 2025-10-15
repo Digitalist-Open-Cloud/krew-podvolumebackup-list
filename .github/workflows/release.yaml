@@ -101,6 +101,7 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: |
             kubectl-podvolumebackup_list
+            podvolumebackup-list.tar.gz
             plugin.sha256
             podvolumebackup-list.yaml
         env:
