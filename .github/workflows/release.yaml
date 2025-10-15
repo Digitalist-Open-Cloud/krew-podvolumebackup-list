@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
+  contents: write    # <-- required to let the token create releases
 
 jobs:
   release:
@@ -26,12 +26,12 @@ jobs:
         run: chmod +x kubectl-podvolumebackup_list
 
       - name: Generate SHA256 checksum
+        id: checksum
         run: |
           sha256sum kubectl-podvolumebackup_list | awk '{print $1}' > plugin.sha256
           echo "sha256=$(cat plugin.sha256)" >> $GITHUB_OUTPUT
-        id: checksum
 
-      - name: Generate Krew manifest (linux/amd64 and darwin/arm64)
+      - name: Generate Krew manifest (linux + mac)
         run: |
           cat <<EOF > podvolumebackup-list.yaml
           apiVersion: krew.googlecontainertools.github.com/v1alpha2
@@ -72,9 +72,30 @@ jobs:
                 kubectl podvolumebackup-list <backup name prefix> [namespace]
           EOF
 
+      - name: Prepare release notes
+        id: notes
+        run: |
+          {
+            echo "## How to install the plugin with Krew"
+            echo ""
+            echo "You can install this version directly with Krew using the manifest from this release:"
+            echo ""
+            echo '```bash'
+            echo "kubectl krew install --manifest=https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.yaml"
+            echo '```'
+            echo ""
+            echo "Or download manually:"
+            echo ""
+            echo " - Script: [kubectl-podvolumebackup_list](${{ steps.vars.outputs.uri }})"
+            echo " - Manifest: [podvolumebackup-list.yaml](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.yaml)"
+            echo ""
+            echo "SHA256: \`${{ steps.checksum.outputs.sha256 }}\`"
+          } > RELEASE_NOTES.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: RELEASE_NOTES.md
           files: |
             kubectl-podvolumebackup_list
             plugin.sha256
