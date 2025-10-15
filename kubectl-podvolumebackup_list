@@ -1,34 +1,86 @@
 #!/bin/bash
 
-if [ $# -ne 1 ]; then
-  echo "Usage: podvolumebackup-list <backup-name>"
-  exit 1
+# Usage:
+#   podvolumebackup-list <backup-name|--all> [--pod=<substring>] [namespace]
+# Exempel:
+#   podvolumebackup-list prod-backup
+#   podvolumebackup-list prod-backup --pod=nginx
+#   podvolumebackup-list --all --pod=nginx
+#   podvolumebackup-list --all --pod=nginx mynamespace
+
+# Förval
+NAMESPACE="velero"
+POD_FILTER=""
+PREFIX=""
+FILTER_ALL=false
+
+# Argumentparsing
+ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --pod=*)
+      POD_FILTER="${arg#--pod=}"
+      ;;
+    --all)
+      FILTER_ALL=true
+      ;;
+    *)
+      ARGS+=("$arg")
+      ;;
+  esac
+done
+
+# Sätt prefix/namespace enligt kvarvarande argument
+if [ "$FILTER_ALL" = false ]; then
+  if [ ${#ARGS[@]} -lt 1 ]; then
+    echo "Usage: $0 <backup-name|--all> [--pod=<substring>] [namespace]"
+    exit 1
+  fi
+  PREFIX="${ARGS[0]}"
+  [ ${#ARGS[@]} -gt 1 ] && NAMESPACE="${ARGS[1]}"
+else
+  [ ${#ARGS[@]} -gt 0 ] && NAMESPACE="${ARGS[0]}"
 fi
 
-PREFIX="$1"
-NAMESPACE="${2:-velero}"
-
-echo "Backup name: $PREFIX"
+echo "Namespace: $NAMESPACE"
+if [ "$FILTER_ALL" = true ]; then
+  echo "Listing all podvolumebackups"
+else
+  echo "Backup name: $PREFIX"
+fi
+[ -n "$POD_FILTER" ] && echo "Pod name contains: $POD_FILTER"
 echo
 
+# Hämta och filtrera resurser
 kubectl get podvolumebackups.velero.io \
   -n "$NAMESPACE" \
   -o json | \
-jq -r --arg PREFIX "${PREFIX}" '
-  .items[] | select(.metadata.name | startswith($PREFIX)) |
-  [
-    (.spec.pod.name // "-"),
-    (.spec.volume // "-"),
-    (.status.progress.totalBytes // 0),
-    (.metadata.creationTimestamp // "-")
-  ] | @tsv' | \
+jq -r \
+  --arg PREFIX "$PREFIX" \
+  --arg PODFILTER "$POD_FILTER" \
+  --argjson ALL "$FILTER_ALL" '
+  .items[]
+  | select(
+      ($ALL or (.metadata.name | startswith($PREFIX)))
+      and
+      ( ($PODFILTER == "") or (.spec.pod.name | test($PODFILTER)) )
+    )
+  | [
+      (.spec.pod.name // "-"),
+      (.spec.volume // "-"),
+      (.status.progress.totalBytes // 0),
+      (.metadata.creationTimestamp // "-")
+    ]
+  | @tsv' | \
 sort -k1,1 | \
-while IFS=$'\t' read -r podname volume size_bytes created
-do
-  size_hr=$(numfmt --to=iec-i --suffix=B --padding=7 "$size_bytes" 2>/dev/null)
-  printf "%-60s %-25s %-10s %s\n" "$podname" "$volume" "$size_hr" "$created"
-done | \
 awk 'BEGIN {
          printf "%-60s %-25s %-10s %s\n", "Pod name", "Volume", "Size", "Created";
          print "------------------------------------------------------------------------------------------------------------";
-     } 1'
+     }
+     {
+         size_hr = $3;
+         cmd = "numfmt --to=iec-i --suffix=B --padding=7 " $3 " 2>/dev/null";
+         cmd | getline size_hr;
+         close(cmd);
+         printf "%-60s %-25s %-10s %s\n", $1, $2, size_hr, $4;
+     }'

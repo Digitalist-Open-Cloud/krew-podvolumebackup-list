@@ -24,6 +24,24 @@ kubectl podvolumebackup-list velero-nightly-20251015050033
 
 And now you should get a list of your pod volume backups.
 
+If you want to list pod volume backups from all backups, instead of providing the backup name, provide the `--all` flag:
+
+```shell
+kubectl podvolumebackup-list --all
+```
+
+Optionally, list only pod volume backups matching pod name, like:
+
+```shell
+kubectl podvolumebackup-list --all --pod=nginx
+```
+
+Or:
+
+```shell
+kubectl podvolumebackup-list velero-nightly-20251015050033 --pod=nginx
+```
+
 ## Requirements
 
 `jq` and `numfmt`
