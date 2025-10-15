@@ -84,7 +84,9 @@ jobs:
             echo "You can install this version directly with Krew using the manifest from this release:"
             echo ""
             echo '```bash'
-            echo "kubectl krew install --manifest=https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.yaml"
+            echo "wget https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.yaml"
+            echo "kubectl krew install --manifest=podvolumebackup-list.yaml"
+            echo "rm podvolumebackup-list.yaml"
             echo '```'
             echo ""
             echo "Or download manually:"
