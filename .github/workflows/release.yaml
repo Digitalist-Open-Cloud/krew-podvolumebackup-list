@@ -1,0 +1,80 @@
+name: Create release for Krew plugin
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set variables (version, URI)
+        id: vars
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+          echo "uri=https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/kubectl-podvolumebackup-list" >> $GITHUB_OUTPUT
+
+      - name: Make sure plugin is executable
+        run: chmod +x kubectl-podvolumebackup-list
+
+      - name: Generate SHA256 checksum
+        run: |
+          sha256sum kubectl-podvolumebackup-list | awk '{print $1}' > plugin.sha256
+          echo "sha256=$(cat plugin.sha256)" >> $GITHUB_OUTPUT
+        id: checksum
+
+      - name: Generate Krew manifest (linux/amd64 and darwin/arm64)
+        run: |
+          cat <<EOF > podvolumebackup-list.yaml
+          apiVersion: krew.googlecontainertools.github.com/v1alpha2
+          kind: Plugin
+          metadata:
+            name: podvolumebackup-list
+          spec:
+            version: "${{ steps.vars.outputs.tag_name }}"
+            homepage: https://github.com/${{ github.repository }}
+            shortDescription: List Velero podvolumebackups with size, pod and date
+            description: |
+              A kubectl plugin to list Velero podvolumebackups for a given prefix, with fields for pod, volume, size and creation date.
+              Requires jq and numfmt installed locally.
+            platforms:
+            - selector:
+                matchLabels:
+                  os: linux
+                  arch: amd64
+              uri: ${{ steps.vars.outputs.uri }}
+              sha256: ${{ steps.checksum.outputs.sha256 }}
+              bin: kubectl-podvolumebackup-list
+              files:
+                - from: kubectl-podvolumebackup-list
+                  to: .
+            - selector:
+                matchLabels:
+                  os: darwin
+                  arch: arm64
+              uri: ${{ steps.vars.outputs.uri }}
+              sha256: ${{ steps.checksum.outputs.sha256 }}
+              bin: kubectl-podvolumebackup-list
+              files:
+                - from: kubectl-podvolumebackup-list
+                  to: .
+            caveats: |
+              This plugin requires 'jq' and 'numfmt' installed and available in your PATH.
+              Usage:
+                kubectl podvolumebackup-list <backup name prefix> [namespace]
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            kubectl-podvolumebackup-list
+            plugin.sha256
+            podvolumebackup-list.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
