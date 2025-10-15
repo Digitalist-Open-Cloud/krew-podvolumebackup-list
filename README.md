@@ -2,6 +2,8 @@
 
 Kubectl Krew plugin to list pod volume backups taken by Velero.
 
+Pod volume backups (PodVolumeBackup) is a custom resource created while doing volume backups with Velero. This plugin reads some data from the custom resource and displays it in a more human readable way.
+
 Takes one required argument, name of Velero backup, and a second optional argument to set which namespace Velero is running in (default `velero`).
 
 Pod volume backups are listed in alphabetic order.
