@@ -8,13 +8,13 @@
 #   podvolumebackup-list --all --pod=nginx
 #   podvolumebackup-list --all --pod=nginx mynamespace
 
-# Förval
+# Default
 NAMESPACE="velero"
 POD_FILTER=""
 PREFIX=""
 FILTER_ALL=false
 
-# Argumentparsing
+# Arguments
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
@@ -30,7 +30,6 @@ for arg in "$@"; do
   esac
 done
 
-# Sätt prefix/namespace enligt kvarvarande argument
 if [ "$FILTER_ALL" = false ]; then
   if [ ${#ARGS[@]} -lt 1 ]; then
     echo "Usage: $0 <backup-name|--all> [--pod=<substring>] [namespace]"
@@ -51,7 +50,7 @@ fi
 [ -n "$POD_FILTER" ] && echo "Pod name contains: $POD_FILTER"
 echo
 
-# Hämta och filtrera resurser
+# Get and filter
 kubectl get podvolumebackups.velero.io \
   -n "$NAMESPACE" \
   -o json | \
@@ -80,7 +79,7 @@ awk 'BEGIN {
      }
      {
          size_hr = $4;
-         cmd = "numfmt --to=iec-i --suffix=B --padding=5 " $4 " 2>/dev/null";
+         cmd = "numfmt --to=iec-i --suffix=B --padding=7 " $4 " 2>/dev/null";
          cmd | getline size_hr;
          close(cmd);
          printf "%-40s %-20s %-15s %-10s %s\n", $1, $2, $3, size_hr, $5;
