@@ -1,0 +1,72 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: podvolumebackup-list
+spec:
+  version: "v0.1.5"
+  homepage: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list
+  shortDescription: List Velero PodVolumeBackups with filters and multiple output formats
+  description: |
+    A kubectl plugin to list Velero PodVolumeBackups with filters for backup prefix, pod name, pod namespace, and volume.
+    Outputs as table (default), JSON, YAML or CSV. Shows size (totalBytes/bytesDone), pod, namespace, volume and timestamps.
+  platforms:
+  - selector:
+      matchLabels:
+        os: linux
+        arch: amd64
+    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.1.5/podvolumebackup-list_linux_amd64.tar.gz
+    sha256: 64d60c40aa2be3842b25297586461fe073e3d182d4fb7743c77f3fced7697502
+    bin: kubectl-podvolumebackup-list
+    files:
+      - from: kubectl-podvolumebackup-list
+        to: .
+  - selector:
+      matchLabels:
+        os: linux
+        arch: arm64
+    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.1.5/podvolumebackup-list_linux_arm64.tar.gz
+    sha256: 5282bdb7c59aab26f18c061c88832d55d4b01951c305afeb8c24699ac223f040
+    bin: kubectl-podvolumebackup-list
+    files:
+      - from: kubectl-podvolumebackup-list
+        to: .
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: amd64
+    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.1.5/podvolumebackup-list_darwin_amd64.tar.gz
+    sha256: 973573c68c29cbd6ef8f571f4d7fc7bfb1d6050dc550c85dfb695bb320de7601
+    bin: kubectl-podvolumebackup-list
+    files:
+      - from: kubectl-podvolumebackup-list
+        to: .
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: arm64
+    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.1.5/podvolumebackup-list_darwin_arm64.tar.gz
+    sha256: 4139de75645c0dba24bed308954bad4f55c9a9528c95d02b26c635d5a6fcca28
+    bin: kubectl-podvolumebackup-list
+    files:
+      - from: kubectl-podvolumebackup-list
+        to: .
+  - selector:
+      matchLabels:
+        os: windows
+        arch: amd64
+    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.1.5/podvolumebackup-list_windows_amd64.zip
+    sha256: fb8e9d4633073a0a24da90971a59d174caaf89b32c33987e398afe6a04e598e3
+    bin: kubectl-podvolumebackup-list.exe
+    files:
+      - from: kubectl-podvolumebackup-list.exe
+        to: .
+  - selector:
+      matchLabels:
+        os: windows
+        arch: arm64
+    uri: https://github.com/Digitalist-Open-Cloud/krew-podvolumebackup-list/releases/download/v0.1.5/podvolumebackup-list_windows_arm64.zip
+    sha256: 68f2723782d99dcecee4f8e0bf95f3de8794ebe555d55d4190a4095f23f4bf59
+    bin: kubectl-podvolumebackup-list.exe
+    files:
+      - from: kubectl-podvolumebackup-list.exe
+        to: .

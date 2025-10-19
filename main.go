@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"golang.org/x/term"
 	"sigs.k8s.io/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -119,6 +120,32 @@ func anyEqual(hay string, allowed []string) bool {
 	return false
 }
 
+// color helpers
+func detectColor(mode string) bool {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode == "never" {
+		return false
+	}
+	if mode == "always" {
+		return true
+	}
+	// auto
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
+func c(enabled bool, code string, s string) string {
+	if !enabled || s == "" {
+		return s
+	}
+	return "\x1b[" + code + "m" + s + "\x1b[0m"
+}
+func prettyDivider(enabled bool) string {
+	line := strings.Repeat("─", 72)
+	return c(enabled, "2", line) // dim
+}
+
 func main() {
 	// Flaggor
 	podFilterFlag := pflag.String("pod", "", "Comma-separated list. Include items where pod name contains ANY of these substrings (case-insensitive)")
@@ -126,13 +153,14 @@ func main() {
 	volumeFilterFlag := pflag.String("volume", "", "Comma-separated list. Include items where volume equals ANY of these (exact match)")
 	allFlag := pflag.Bool("all", false, "List all podvolumebackups instead of filtering by backup name prefix")
 	veleroNsFlag := pflag.String("velero-namespace", "velero", "Namespace where PodVolumeBackup CRs are (default: velero)")
-	outputFlag := pflag.StringP("output", "o", "table", "Output format: table|json|yaml|csv")
+	outputFlag := pflag.StringP("output", "o", "table", "Output format: table|json|yaml|csv|pretty")
+	colorFlag := pflag.String("color", "auto", "Color mode for pretty output: auto|always|never")
 	debugFlag := pflag.Bool("debug", false, "Print debug info to stderr")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `
 Usage:
-  kubectl podvolumebackup-list [prefix|--all] [--velero-namespace=<ns>] [--pod=a,b] [--pod-namespace=x,y] [--volume=v1,v2] [-o table|json|yaml|csv] [--debug]
+  kubectl podvolumebackup-list [prefix|--all] [--velero-namespace=<ns>] [--pod=a,b] [--pod-namespace=x,y] [--volume=v1,v2] [-o table|json|yaml|csv|pretty] [--color=auto|always|never] [--debug]
 
 Notes:
   --pod            substring match (case-insensitive), ANY of comma-separated values
@@ -140,9 +168,8 @@ Notes:
   --volume         exact match, ANY of comma-separated values
 
 Examples:
-  kubectl podvolumebackup-list --all --pod=nginx,redis --pod-namespace=dev,prod --volume=data,cache -o table
+  kubectl podvolumebackup-list --all --pod=nginx,redis --pod-namespace=dev,prod --volume=data,cache -o pretty
   kubectl podvolumebackup-list nightly- --pod=nginx --pod-namespace=prod --volume=myvol --velero-namespace=velero -o json
-  kubectl podvolumebackup-list --all -o csv
 `)
 		pflag.PrintDefaults()
 	}
@@ -193,15 +220,15 @@ Examples:
 	// Validera output
 	outMode := strings.ToLower(strings.TrimSpace(*outputFlag))
 	switch outMode {
-	case "table", "json", "yaml", "csv":
+	case "table", "json", "yaml", "csv", "pretty":
 	default:
-		fmt.Fprintf(os.Stderr, "Invalid --output: %s (allowed: table|json|yaml|csv)\n", outMode)
+		fmt.Fprintf(os.Stderr, "Invalid --output: %s (allowed: table|json|yaml|csv|pretty)\n", outMode)
 		os.Exit(1)
 	}
+	colorEnabled := detectColor(*colorFlag)
 
 	// Samla resultat
 	rows := make([]row, 0, len(pvbList.Items))
-
 	for _, item := range pvbList.Items {
 		name := item.GetName()
 		if !*allFlag && !strings.HasPrefix(name, prefix) {
@@ -234,7 +261,7 @@ Examples:
 			}
 		}
 
-		// Filtrera (OR inom respektive flagga)
+		// Filtrera
 		if len(podNeedles) > 0 && (podName == "" || !anyContainsFold(podName, podNeedles)) {
 			continue
 		}
@@ -290,7 +317,7 @@ Examples:
 		})
 	}
 
-	// Sortering: podName, sedan volume
+	// Sortera: podName, sedan volume
 	sort.Slice(rows, func(i, j int) bool {
 		if rows[i].PodName == rows[j].PodName {
 			return rows[i].Volume < rows[j].Volume
@@ -298,7 +325,7 @@ Examples:
 		return rows[i].PodName < rows[j].PodName
 	})
 
-	// Skriv ut enligt valt format
+	// Skriv ut
 	switch outMode {
 	case "json":
 		enc := json.NewEncoder(os.Stdout)
@@ -335,6 +362,48 @@ Examples:
 		if err := w.Error(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to write CSV: %v\n", err)
 			os.Exit(1)
+		}
+	case "pretty":
+		// Vertikal, färgsatt lista
+		title := c(colorEnabled, "1;34", "PodVolumeBackup") // bold blue
+		fmt.Printf("%s %s\n", title, c(colorEnabled, "2", fmt.Sprintf("(%d items)", len(rows))))
+		if len(rows) > 0 {
+			fmt.Println(prettyDivider(colorEnabled))
+		}
+		for i, r := range rows {
+			// labels
+			lbl := func(s string) string { return c(colorEnabled, "36", s) } // cyan
+			val := func(s string) string { return c(colorEnabled, "97", s) } // bright white
+			sec := func(s string) string { return c(colorEnabled, "2", s) }  // dim
+			bold := func(s string) string { return c(colorEnabled, "1", s) } // bold
+			// field values
+			sizeOut := "-"
+			if r.SizeBytes != nil {
+				sizeOut = r.SizeHuman
+				if sizeOut == "" {
+					sizeOut = humanBytes(*r.SizeBytes)
+				}
+			}
+			created := r.Created
+			if created == "" && r.CreatedRFC3339 != "" {
+				created = r.CreatedRFC3339
+			}
+			// lines
+			fmt.Printf("%s %s\n", lbl("Backup:    "), bold(val(r.BackupName)))
+			fmt.Printf("%s %s\n", lbl("Pod:       "), val(r.PodName))
+			fmt.Printf("%s %s\n", lbl("Namespace: "), val(r.PodNamespace))
+			fmt.Printf("%s %s\n", lbl("Volume:    "), val(r.Volume))
+			fmt.Printf("%s %s", lbl("Size:      "), val(sizeOut))
+			if r.SizeBytes != nil {
+				fmt.Printf(" %s", sec(fmt.Sprintf("(%d bytes)", *r.SizeBytes)))
+			}
+			fmt.Println()
+			fmt.Printf("%s %s\n", lbl("Created:   "), val(created))
+			fmt.Printf("%s %s\n", lbl("Resource:  "), sec(r.ResourceName))
+
+			if i < len(rows)-1 {
+				fmt.Println(prettyDivider(colorEnabled))
+			}
 		}
 	default: // table
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
