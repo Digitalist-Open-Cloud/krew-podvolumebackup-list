@@ -24,14 +24,14 @@ jobs:
           echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           echo "REPO=${{ github.repository }}" >> $GITHUB_ENV
 
-      - name: Build and package (linux & darwin)
+      - name: Build and package (linux, darwin, windows)
         run: |
           set -euo pipefail
 
           BASENAME="kubectl-podvolumebackup-list"
           mkdir -p dist
 
-          build_one () {
+          build_nix () {
             GOOS="$1"; GOARCH="$2"
             OUTBIN="$BASENAME"
             ARCHIVE="podvolumebackup-list_${GOOS}_${GOARCH}.tar.gz"
@@ -45,15 +45,39 @@ jobs:
             rm -f "$OUTBIN"
 
             SHA=$(sha256sum "dist/$ARCHIVE" | awk '{print $1}')
-            # Exportera SHA som env-variabel för senare steg
             VAR="SHA_$(echo $GOOS | tr '[:lower:]' '[:upper:]')_$(echo $GOARCH | tr '[:lower:]' '[:upper:]')"
             echo "$VAR=$SHA" >> $GITHUB_ENV
           }
 
-          build_one linux amd64
-          build_one linux arm64
-          build_one darwin amd64
-          build_one darwin arm64
+          build_win () {
+            GOARCH="$1"
+            OUTBIN="${BASENAME}.exe"
+            ARCHIVE="podvolumebackup-list_windows_${GOARCH}.zip"
+
+            echo "==> Building windows/${GOARCH}"
+            rm -f "$OUTBIN"
+            CGO_ENABLED=0 GOOS=windows GOARCH="$GOARCH" go build -trimpath -ldflags="-s -w" -o "$OUTBIN" .
+
+            echo "==> Packaging $ARCHIVE"
+            (cd . && zip -q "dist/$ARCHIVE" "$OUTBIN")
+            rm -f "$OUTBIN"
+
+            SHA=$(sha256sum "dist/$ARCHIVE" | awk '{print $1}')
+            VAR="SHA_WINDOWS_$(echo $GOARCH | tr '[:lower:]' '[:upper:]')"
+            echo "$VAR=$SHA" >> $GITHUB_ENV
+          }
+
+          # Linux
+          build_nix linux amd64
+          build_nix linux arm64
+
+          # macOS
+          build_nix darwin amd64
+          build_nix darwin arm64
+
+          # Windows
+          build_win amd64
+          build_win arm64
 
       - name: Generate Krew manifest
         run: |
@@ -110,6 +134,26 @@ jobs:
               files:
                 - from: kubectl-podvolumebackup-list
                   to: .
+            - selector:
+                matchLabels:
+                  os: windows
+                  arch: amd64
+              uri: https://github.com/${REPO}/releases/download/${TAG}/podvolumebackup-list_windows_amd64.zip
+              sha256: ${SHA_WINDOWS_AMD64}
+              bin: kubectl-podvolumebackup-list.exe
+              files:
+                - from: kubectl-podvolumebackup-list.exe
+                  to: .
+            - selector:
+                matchLabels:
+                  os: windows
+                  arch: arm64
+              uri: https://github.com/${REPO}/releases/download/${TAG}/podvolumebackup-list_windows_arm64.zip
+              sha256: ${SHA_WINDOWS_ARM64}
+              bin: kubectl-podvolumebackup-list.exe
+              files:
+                - from: kubectl-podvolumebackup-list.exe
+                  to: .
           EOF
 
       - name: Prepare release notes
@@ -124,8 +168,6 @@ jobs:
             echo "rm podvolumebackup-list.yaml"
             echo '```'
             echo
-            echo "Alternatively, add it to your custom index."
-            echo
             echo "Binaries & checksums are attached to this release."
           } > dist/RELEASE_NOTES.md
 
@@ -138,6 +180,8 @@ jobs:
             dist/podvolumebackup-list_linux_arm64.tar.gz
             dist/podvolumebackup-list_darwin_amd64.tar.gz
             dist/podvolumebackup-list_darwin_arm64.tar.gz
+            dist/podvolumebackup-list_windows_amd64.zip
+            dist/podvolumebackup-list_windows_arm64.zip
             dist/podvolumebackup-list.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
