@@ -1,12 +1,10 @@
-name: Create release for Krew plugin
-
+name: Release Krew plugin (Go)
 on:
   push:
     tags:
       - 'v*'
-
 permissions:
-  contents: write    # <-- required to let the token create releases
+  contents: write
 
 jobs:
   release:
@@ -15,96 +13,131 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set variables (version, URI)
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.x'
+
+      - name: Set variables
         id: vars
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
-          echo "uri=https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/kubectl-podvolumebackup_list" >> $GITHUB_OUTPUT
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          echo "REPO=${{ github.repository }}" >> $GITHUB_ENV
 
-      - name: Make sure plugin is executable
-        run: chmod +x kubectl-podvolumebackup_list
-
-      - name: Create plugin archive
-        run: tar -czf podvolumebackup-list.tar.gz kubectl-podvolumebackup_list
-
-      - name: Generate SHA256 checksum
-        id: checksum
+      - name: Build and package (linux & darwin)
         run: |
-          sha256sum podvolumebackup-list.tar.gz | awk '{print $1}' > plugin.sha256
-          echo "sha256=$(cat plugin.sha256)" >> $GITHUB_OUTPUT
+          set -euo pipefail
 
-      - name: Generate Krew manifest (linux + mac)
+          BASENAME="kubectl-podvolumebackup-list"
+          mkdir -p dist
+
+          build_one () {
+            GOOS="$1"; GOARCH="$2"
+            OUTBIN="$BASENAME"
+            ARCHIVE="podvolumebackup-list_${GOOS}_${GOARCH}.tar.gz"
+
+            echo "==> Building $GOOS/$GOARCH"
+            rm -f "$OUTBIN"
+            CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build -trimpath -ldflags="-s -w" -o "$OUTBIN" .
+
+            echo "==> Packaging $ARCHIVE"
+            tar -czf "dist/$ARCHIVE" "$OUTBIN"
+            rm -f "$OUTBIN"
+
+            SHA=$(sha256sum "dist/$ARCHIVE" | awk '{print $1}')
+            # Exportera SHA som env-variabel för senare steg
+            VAR="SHA_$(echo $GOOS | tr '[:lower:]' '[:upper:]')_$(echo $GOARCH | tr '[:lower:]' '[:upper:]')"
+            echo "$VAR=$SHA" >> $GITHUB_ENV
+          }
+
+          build_one linux amd64
+          build_one linux arm64
+          build_one darwin amd64
+          build_one darwin arm64
+
+      - name: Generate Krew manifest
         run: |
-          cat <<EOF > podvolumebackup-list.yaml
+          cat > dist/podvolumebackup-list.yaml <<EOF
           apiVersion: krew.googlecontainertools.github.com/v1alpha2
           kind: Plugin
           metadata:
             name: podvolumebackup-list
           spec:
-            version: "${{ steps.vars.outputs.tag_name }}"
-            homepage: https://github.com/${{ github.repository }}
-            shortDescription: List Velero podvolumebackups with size, pod and date
+            version: "${TAG}"
+            homepage: https://github.com/${REPO}
+            shortDescription: List Velero PodVolumeBackups with filters and multiple output formats
             description: |
-              A kubectl plugin to list Velero podvolumebackups for a given prefix, with fields for pod, volume, size and creation date.
-              Requires jq and numfmt installed locally.
+              A kubectl plugin to list Velero PodVolumeBackups with filters for backup prefix, pod name, pod namespace, and volume.
+              Outputs as table (default), JSON, YAML or CSV. Shows size (totalBytes/bytesDone), pod, namespace, volume and timestamps.
             platforms:
             - selector:
                 matchLabels:
                   os: linux
                   arch: amd64
-              uri: https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.tar.gz
-              sha256: ${{ steps.checksum.outputs.sha256 }}
-              bin: kubectl-podvolumebackup_list
+              uri: https://github.com/${REPO}/releases/download/${TAG}/podvolumebackup-list_linux_amd64.tar.gz
+              sha256: ${SHA_LINUX_AMD64}
+              bin: kubectl-podvolumebackup-list
               files:
-                - from: kubectl-podvolumebackup_list
+                - from: kubectl-podvolumebackup-list
+                  to: .
+            - selector:
+                matchLabels:
+                  os: linux
+                  arch: arm64
+              uri: https://github.com/${REPO}/releases/download/${TAG}/podvolumebackup-list_linux_arm64.tar.gz
+              sha256: ${SHA_LINUX_ARM64}
+              bin: kubectl-podvolumebackup-list
+              files:
+                - from: kubectl-podvolumebackup-list
+                  to: .
+            - selector:
+                matchLabels:
+                  os: darwin
+                  arch: amd64
+              uri: https://github.com/${REPO}/releases/download/${TAG}/podvolumebackup-list_darwin_amd64.tar.gz
+              sha256: ${SHA_DARWIN_AMD64}
+              bin: kubectl-podvolumebackup-list
+              files:
+                - from: kubectl-podvolumebackup-list
                   to: .
             - selector:
                 matchLabels:
                   os: darwin
                   arch: arm64
-              uri: https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.tar.gz
-              sha256: ${{ steps.checksum.outputs.sha256 }}
-              bin: kubectl-podvolumebackup_list
+              uri: https://github.com/${REPO}/releases/download/${TAG}/podvolumebackup-list_darwin_arm64.tar.gz
+              sha256: ${SHA_DARWIN_ARM64}
+              bin: kubectl-podvolumebackup-list
               files:
-                - from: kubectl-podvolumebackup_list
+                - from: kubectl-podvolumebackup-list
                   to: .
-            caveats: |
-              This plugin requires 'jq' and 'numfmt' installed and available in your PATH.
-              Usage:
-                kubectl podvolumebackup-list <backup name prefix> [namespace]
           EOF
 
       - name: Prepare release notes
-        id: notes
         run: |
           {
             echo "## How to install the plugin with Krew"
-            echo ""
-            echo "You can install this version directly with Krew using the manifest from this release:"
-            echo ""
+            echo
+            echo "Download the manifest from this release and install:"
             echo '```bash'
-            echo "wget https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.yaml"
+            echo "curl -LO https://github.com/${REPO}/releases/download/${TAG}/podvolumebackup-list.yaml"
             echo "kubectl krew install --manifest=podvolumebackup-list.yaml"
             echo "rm podvolumebackup-list.yaml"
             echo '```'
-            echo ""
-            echo "Or download manually:"
-            echo ""
-            echo " - Script: [kubectl-podvolumebackup_list](${{ steps.vars.outputs.uri }})"
-            echo " - Manifest: [podvolumebackup-list.yaml](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag_name }}/podvolumebackup-list.yaml)"
-            echo ""
-            echo "SHA256: \`${{ steps.checksum.outputs.sha256 }}\`"
-          } > RELEASE_NOTES.md
+            echo
+            echo "Alternatively, add it to your custom index."
+            echo
+            echo "Binaries & checksums are attached to this release."
+          } > dist/RELEASE_NOTES.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: RELEASE_NOTES.md
+          body_path: dist/RELEASE_NOTES.md
           files: |
-            kubectl-podvolumebackup_list
-            podvolumebackup-list.tar.gz
-            plugin.sha256
-            podvolumebackup-list.yaml
+            dist/podvolumebackup-list_linux_amd64.tar.gz
+            dist/podvolumebackup-list_linux_arm64.tar.gz
+            dist/podvolumebackup-list_darwin_amd64.tar.gz
+            dist/podvolumebackup-list_darwin_arm64.tar.gz
+            dist/podvolumebackup-list.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
